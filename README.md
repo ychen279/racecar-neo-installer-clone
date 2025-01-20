@@ -6,7 +6,7 @@ Template repository for native RACECAR installation (Entry Point)
 
 For Windows 10/11, macOS 10.15+ (Catalina+, >2020), and Linux (tested distros include Ubuntu 20+ & Debian 10+)
 
-## Prerequisites
+## Prerequisites _
 
 Python 3.9.7 installation
 
