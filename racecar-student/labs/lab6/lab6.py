@@ -41,8 +41,9 @@ import sys
 
 # If this file is nested inside a folder in the labs folder, the relative path should
 # be [1, ../../library] instead.
-sys.path.insert(0, '../library')
+sys.path.insert(0, '../../library')
 import racecar_core
+import numpy as np
 
 ########################################################################################
 # Global variables
@@ -51,6 +52,13 @@ import racecar_core
 rc = racecar_core.create_racecar()
 
 # Declare any global variables here
+frontHalfAngle = 90 #degree to sample lidar
+errBuf = []
+bufLen = 10
+Kp=1
+Ki=0
+Kd=0
+speed = 1.0
 
 
 ########################################################################################
@@ -59,15 +67,60 @@ rc = racecar_core.create_racecar()
 
 # [FUNCTION] The start function is run once every time the start button is pressed
 def start():
-    pass  # Remove 'pass' and write your source code for the start() function here
+    rc.drive.set_speed_angle(0, 0)
+
+
+def FindFarDistAngle(lidarSample,frontHalfAngle=90):
+    #lidarSample = rc.lidar.get_samples()
+    samples = np.array(lidarSample)
+    angles = np.linspace(0, 360, len(samples)+1)[0:-1]
+    samples[samples==0] = np.max(samples)
+    samplesFront = np.concatenate((samples[angles>=(360-frontHalfAngle)],samples[angles<=frontHalfAngle]))
+    anglesFront = np.concatenate((angles[angles>=(360-frontHalfAngle)]-360,angles[angles<=frontHalfAngle]))
+    farDistAng = np.sum(samplesFront*anglesFront)/np.sum(samplesFront)
+    return farDistAng
+
+
+def PID(errN,errBuf,Kp=0,Ki=0,Kd=0,bufLen=10):
+    #Positive Error output Positive Control
+    #Create Error Buffer for I controller
+    if (bufLen < 5):
+        bufLen = 5 #Minimum Buffer for the damping
+    if (len(errBuf)>=bufLen):
+        errBuf.pop(0)
+        errBuf.append(errN)
+    else:
+        errBuf.append(errN)
+        
+    # P Control
+    P = Kp * errN
+    # I Control
+    I = Ki * sum(errBuf) 
+    # D Control
+    if (len(errBuf)>=5):
+        D = Kd * (1/12) * (-errBuf[-1]+8*errBuf[-2]-8*errBuf[-4]+errBuf[-5])
+    else:
+        D = 0.0
+    
+    return P+I+D
 
 
 # [FUNCTION] After start() is run, this function is run once every frame (ideally at
 # 60 frames per second or slower depending on processing speed) until the back button
 # is pressed  
 def update():
-    pass  # Remove 'pass' and write your source code for the update() function here
-
+    #Read gloabl parameters
+    global frontHalfAngle, errBuf, bufLen, Kp,Ki,Kd, speed
+    #Read Lidar Data
+    samples = rc.lidar.get_samples()
+    farDistAng = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle)
+    errAngN = farDistAng/frontHalfAngle #normalized error(-1,1) -(left) and +(right)
+    print("errAngle",errAngN)
+    #Feed into PID Angle Decision
+    contAng = PID(errAngN,errBuf,Kp=Kp,Ki=Ki,Kd=Kd,bufLen=bufLen)
+    contAng = np.clip(contAng,-1,1)
+    #Implement Action
+    rc.drive.set_speed_angle(speed, contAng)
 
 # [FUNCTION] update_slow() is similar to update() but is called once per second by
 # default. It is especially useful for printing debug messages, since printing a 
