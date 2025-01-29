@@ -56,13 +56,13 @@ rc = racecar_core.create_racecar()
 frontHalfAngle = 90 #degree to sample lidar
 errBuf = []
 bufLen = 10
-Kp=1
+Kp=1.5
 Ki=0
 Kd=0
 speed = 1.0
 peakWidThres = 5 #Minimum three degree width to be classify as a peak
 devCount = 20 #Deviation Counter
-devThres = 0.6 #Percentage threshold for cliff identification
+devThres = 0.3 #Percentage threshold for cliff identification
 
 
 ########################################################################################
@@ -97,7 +97,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=10,
     # print("widths",widths)
     heights = samplesFront[peaks] #Find the depth of each peak
     # print("heights",heights)
-    spaces = widths*heights #Find the space within each peak
+    spaces = widths*(heights)**2 #Find the space within each peak
     # print("spaces",spaces)
     idxfarDist = peaks[np.argmax(spaces)]
     widfarDist = widths[np.argmax(spaces)]
