@@ -105,7 +105,10 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=45)
     idxfarDistHigh = np.clip(idxfarDist+devCount,1,len(anglesFront)-2)
     meanDistLow = np.mean(samplesFront[idxfarDistLow:idxfarDist])#Average Left Peak Distance
     meanDistHigh = np.mean(samplesFront[idxfarDist+1:idxfarDistHigh+1])#Average Right Peak Distance
-    diffDistLowHigh = np.abs(meanDistLow-meanDistHigh)/np.max([meanDistLow,meanDistHigh]) #See if the difference is large
+    if np.max([meanDistLow,meanDistHigh]) > 0.0:
+        diffDistLowHigh = np.abs(meanDistLow-meanDistHigh)/np.max([meanDistLow,meanDistHigh]) #See if the difference is large
+    else:
+        diffDistLowHigh = 0.0 #Default no difference
     print("diffDistLowHigh",diffDistLowHigh)
     #Compute Distance Weighted Angle
     print("Peak Width (deg)",widfarDist/2)
