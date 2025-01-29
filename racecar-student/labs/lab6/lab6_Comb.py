@@ -117,12 +117,14 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=10,
         farDistAng += (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*diffDistLowHigh
         if minDist < 60:
             print("Right")
-            farDistAng += 0.1*(anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*((60-minDist)/60)
+            print(((60-minDist)/60))
+            farDistAng += (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*((60-minDist)/60)
     else:
         farDistAng -= (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*diffDistLowHigh
         if minDist < 60:
             print("Left")
-            farDistAng -= 0.1*(anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*((60-minDist)/60)
+            print(((60-minDist)/60))
+            farDistAng -= (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*((60-minDist)/60)
     print(farDistAng)
     return farDistAng
 
