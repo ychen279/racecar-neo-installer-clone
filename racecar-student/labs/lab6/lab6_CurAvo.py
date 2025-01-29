@@ -93,7 +93,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devAngle=20,
     peaks = np.array(peaks)
     widths = np.array(widths)
     heights = samplesFront[peaks] #Find the depth of each peak
-    spaces = widths*heights #Find the space within each peak
+    spaces = widths+heights #Find the space within each peak
     idxfarDist = peaks[np.argmax(spaces)]
     widfarDist = widths[np.argmax(spaces)]
     idxfarDistLow = np.clip(idxfarDist-int(widfarDist/2),1,len(anglesFront)-2)
