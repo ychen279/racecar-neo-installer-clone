@@ -41,7 +41,7 @@ import sys
 
 # If this file is nested inside a folder in the labs folder, the relative path should
 # be [1, ../../library] instead.
-sys.path.insert(0, '../../library')
+sys.path.insert(0, '../library')
 import racecar_core
 import numpy as np
 import scipy.signal as signal
@@ -74,11 +74,12 @@ def start():
     # FindFarDistAngle(samples)
 
 
-def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=10):
+def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=45):
     #Expect this input lidarSample = rc.lidar.get_samples()
     samples = np.array(lidarSample)
     angles = np.linspace(0, 360, len(samples)+1)[0:-1]
-    samples[samples==0] = np.max(samples)
+    if len(samples[samples==0])>0:
+        samples[samples==0] = np.max(samples)
     samplesFront = np.concatenate((samples[angles>=(360-frontHalfAngle)],samples[angles<=frontHalfAngle]))
     anglesFront = np.concatenate((angles[angles>=(360-frontHalfAngle)]-360,angles[angles<=frontHalfAngle]))
     ##Create a buffer for peak identification
@@ -95,7 +96,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=10)
     # print("widths",widths)
     heights = samplesFront[peaks] #Find the depth of each peak
     # print("heights",heights)
-    spaces = widths*heights #Find the space within each peak
+    spaces = widths+heights #Find the space within each peak
     # print("spaces",spaces)
     idxfarDist = peaks[np.argmax(spaces)]
     widfarDist = widths[np.argmax(spaces)]
