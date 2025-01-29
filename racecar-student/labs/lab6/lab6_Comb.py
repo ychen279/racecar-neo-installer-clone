@@ -56,10 +56,10 @@ rc = racecar_core.create_racecar()
 frontHalfAngle = 90 #degree to sample lidar
 errBuf = []
 bufLen = 10
-Kp=1
-Ki=0
-Kd=0
-speed = 1.0
+Kp=0.9
+Ki=0.05
+Kd=0.8
+speed = 0.9
 peakWidThres = 5 #Minimum three degree width to be classify as a peak
 devCount = 45 #Deviation Counter
 
@@ -93,12 +93,12 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=45)
     peaks = np.array(peaks)
     widths = np.array(widths)
     # print("peaks",peaks)
-    print("widths",np.round(widths))
+    print("widths---------------",np.round(widths))
     heights = samplesFront[peaks] #Find the depth of each peak
-    print("heights",np.round(heights))
+    print("heights--------------------------------------------",np.round(heights))
     print("Angles",np.round(anglesFront[peaks]))
-    spaces = widths+heights #Find the space within each peak
-    print("spaces",np.round(spaces))
+    spaces = widths*heights**2 #Find the space within each peak
+    # print("spaces",np.round(spaces))
     idxfarDist = peaks[np.argmax(spaces)]
     widfarDist = widths[np.argmax(spaces)]
     #Filter out large gradient
@@ -110,9 +110,9 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=45)
         diffDistLowHigh = np.abs(meanDistLow-meanDistHigh)/np.max([meanDistLow,meanDistHigh]) #See if the difference is large
     else:
         diffDistLowHigh = 0.0 #Default no difference
-    print("diffDistLowHigh",diffDistLowHigh)
+    # print("diffDistLowHigh",diffDistLowHigh)
     #Compute Distance Weighted Angle
-    print("Peak Width (deg)",widfarDist/2)
+    # print("Peak Width (deg)",widfarDist/2)
     farDistAng = anglesFront[idxfarDist]
     #Smooth Cliffing
     if meanDistHigh>meanDistLow:
@@ -160,8 +160,9 @@ def update():
     #Feed into PID Angle Decision
     contAng = PID(errAngN,errBuf,Kp=Kp,Ki=Ki,Kd=Kd,bufLen=bufLen)
     contAng = np.clip(contAng,-1,1)
+    speedUse = speed - 0.4*np.abs(contAng)
     #Implement Action
-    rc.drive.set_speed_angle(speed, contAng)
+    rc.drive.set_speed_angle(speedUse, contAng)
     # pass
 
 # [FUNCTION] update_slow() is similar to update() but is called once per second by
