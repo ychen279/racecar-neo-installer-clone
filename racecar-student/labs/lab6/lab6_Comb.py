@@ -102,10 +102,11 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=10,
     idxfarDist = peaks[np.argmax(spaces)]
     widfarDist = widths[np.argmax(spaces)]
     #Filter out large gradient
-    idxfarDistLow = np.clip(idxfarDist-devCount,0,len(anglesFront)-1)
-    idxfarDistHigh = np.clip(idxfarDist+devCount,0,len(anglesFront)-1)
+    idxfarDistLow = np.clip(idxfarDist-devCount,1,len(anglesFront)-2)
+    idxfarDistHigh = np.clip(idxfarDist+devCount,1,len(anglesFront)-2)
     meanDistLow = np.mean(samplesFront[idxfarDistLow:idxfarDist+1])#Average Left Peak Distance
     meanDistHigh = np.mean(samplesFront[idxfarDist:idxfarDistHigh+1])#Average Right Peak Distance
+    minDist = np.min(samplesFront[1:len(anglesFront)-2])#Min Distance
     diffDistLowHigh = np.abs(meanDistLow-meanDistHigh)/np.max([meanDistLow,meanDistHigh]) #See if the difference is large
     print("diffDistLowHigh",diffDistLowHigh)
     #Compute Distance Weighted Angle
@@ -113,9 +114,15 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=10,
     farDistAng = anglesFront[idxfarDist]
     #Smooth Cliffing
     if meanDistHigh>meanDistLow:
-        farDistAng += 2*(anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*diffDistLowHigh
+        farDistAng += (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*diffDistLowHigh
+        if minDist < 60:
+            print("Right")
+            farDistAng += 0.1*(anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*((60-minDist)/60)
     else:
-        farDistAng -= 2*(anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*diffDistLowHigh  
+        farDistAng -= (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*diffDistLowHigh
+        if minDist < 60:
+            print("Left")
+            farDistAng -= 0.1*(anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*((60-minDist)/60)
     print(farDistAng)
     return farDistAng
 
