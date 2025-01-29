@@ -61,8 +61,8 @@ Ki=0
 Kd=0
 speed = 1.0
 peakWidThres = 5 #Minimum three degree width to be classify as a peak
-devAngle = 30 #Deviation Counter
-devThres = 50 #Deviation distance limit
+devAngle = 70 #Deviation Counter
+devThres = 60 #Deviation distance limit
 
 
 ########################################################################################
@@ -106,11 +106,11 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devAngle=20,
     if minDistLow < devThres:
         print("Left Collision Warning")
         devFactor = (devThres-minDistLow)/devThres # 1.0 if distance is zero 0.0 if distance is devThres
-        farDistAng = devAngle*devFactor
+        farDistAng += devAngle*devFactor
     if minDistHigh < devThres:
         print("Right Collision Warning")
         devFactor = (devThres-minDistHigh)/devThres # 1.0 if distance is zero 0.0 if distance is devThres
-        farDistAng = -devAngle*devFactor
+        farDistAng -= devAngle*devFactor
     print(farDistAng)
     return farDistAng
 
