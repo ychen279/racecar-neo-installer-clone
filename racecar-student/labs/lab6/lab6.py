@@ -70,6 +70,8 @@ peakWidThres = 5 #Minimum three degree width to be classify as a peak
 # [FUNCTION] The start function is run once every time the start button is pressed
 def start():
     rc.drive.set_speed_angle(0, 0)
+    # samples = rc.lidar.get_samples()
+    # FindFarDistAngle(samples)
 
 
 def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5):
@@ -83,6 +85,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5):
     samplesFront[0] = 0.0 #Create two notches at the edges for peak identification
     samplesFront[-1] = 0.0
     # Find the max distance angle
+    # print("samplesFront",samplesFront)
     peaks, _ = signal.find_peaks(samplesFront,width=peakWidThres) #int List of indices for peak locations
     widths = signal.peak_widths(samplesFront,peaks) #List of size of these peaks in degrees
     widths = widths[0] #List of size of these peaks in degrees
@@ -95,7 +98,11 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5):
     spaces = widths*heights #Find the space within each peak
     # print("spaces",spaces)
     idxfarDist = peaks[np.argmax(spaces)]
-    farDistAng = anglesFront[idxfarDist]
+    widfarDist = widths[np.argmax(spaces)]
+    #Filter out large gradient
+    idxfarDistLow = np.clip(idxfarDist-int(widfarDist),0,len(anglesFront)-1)
+    idxfarDistHigh = np.clip(idxfarDist+int(widfarDist),0,len(anglesFront)-1)
+    farDistAng = np.sum(anglesFront[idxfarDistLow:idxfarDistHigh+1]*samplesFront[idxfarDistLow:idxfarDistHigh+1])/np.sum(samplesFront[idxfarDistLow:idxfarDistHigh+1])
     # print(farDistAng)
     return farDistAng
 
@@ -139,6 +146,7 @@ def update():
     contAng = np.clip(contAng,-1,1)
     #Implement Action
     rc.drive.set_speed_angle(speed, contAng)
+    # pass
 
 # [FUNCTION] update_slow() is similar to update() but is called once per second by
 # default. It is especially useful for printing debug messages, since printing a 
