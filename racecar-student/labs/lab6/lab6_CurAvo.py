@@ -61,8 +61,8 @@ Ki=0
 Kd=0
 speed = 1.0
 peakWidThres = 5 #Minimum three degree width to be classify as a peak
-devAngle = 30 #Deviation Counter
-devThres = 40 #Deviation distance limit
+devAngle = 80 #Deviation Counter
+devThres = 50 #Deviation distance limit
 
 
 ########################################################################################
@@ -72,8 +72,8 @@ devThres = 40 #Deviation distance limit
 # [FUNCTION] The start function is run once every time the start button is pressed
 def start():
     rc.drive.set_speed_angle(0, 0)
-    samples = rc.lidar.get_samples()
-    FindFarDistAngle(samples)
+    # samples = rc.lidar.get_samples()
+    # FindFarDistAngle(samples)
 
 
 def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devAngle=20, devThres=20):
@@ -86,7 +86,6 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devAngle=20,
     ##Create a buffer for peak identification
     samplesFront[0] = 0.0 #Create two notches at the edges for peak identification
     samplesFront[-1] = 0.0
-    print(samplesFront)
     # Find the max distance angle
     peaks, _ = signal.find_peaks(samplesFront,width=peakWidThres) #int List of indices for peak locations
     widths = signal.peak_widths(samplesFront,peaks) #List of size of these peaks in degrees
@@ -112,6 +111,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devAngle=20,
         print("Right Collision Warning")
         devFactor = (devThres-minDistHigh)/devThres # 1.0 if distance is zero 0.0 if distance is devThres
         farDistAng = -devAngle*devFactor
+    print(farDistAng)
     return farDistAng
 
 
@@ -143,18 +143,18 @@ def PID(errN,errBuf,Kp=0,Ki=0,Kd=0,bufLen=10):
 # 60 frames per second or slower depending on processing speed) until the back button
 # is pressed  
 def update():
-    # #Read gloabl parameters
-    # global frontHalfAngle, errBuf, bufLen, Kp,Ki,Kd, speed, peakWidThres, devAngle, devThres
-    # #Read Lidar Data
-    # samples = rc.lidar.get_samples()
-    # farDistAng = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle,peakWidThres=peakWidThres, devAngle=devAngle, devThres=devThres)
-    # errAngN = farDistAng/frontHalfAngle #normalized error(-1,1) -(left) and +(right)
-    # #Feed into PID Angle Decision
-    # contAng = PID(errAngN,errBuf,Kp=Kp,Ki=Ki,Kd=Kd,bufLen=bufLen)
-    # contAng = np.clip(contAng,-1,1)
-    # #Implement Action
-    # rc.drive.set_speed_angle(speed, contAng)
-    pass
+    #Read gloabl parameters
+    global frontHalfAngle, errBuf, bufLen, Kp,Ki,Kd, speed, peakWidThres, devAngle, devThres
+    #Read Lidar Data
+    samples = rc.lidar.get_samples()
+    farDistAng = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle,peakWidThres=peakWidThres, devAngle=devAngle, devThres=devThres)
+    errAngN = farDistAng/frontHalfAngle #normalized error(-1,1) -(left) and +(right)
+    #Feed into PID Angle Decision
+    contAng = PID(errAngN,errBuf,Kp=Kp,Ki=Ki,Kd=Kd,bufLen=bufLen)
+    contAng = np.clip(contAng,-1,1)
+    #Implement Action
+    rc.drive.set_speed_angle(speed, contAng)
+    # pass
 
 # [FUNCTION] update_slow() is similar to update() but is called once per second by
 # default. It is especially useful for printing debug messages, since printing a 
