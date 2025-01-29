@@ -56,14 +56,12 @@ rc = racecar_core.create_racecar()
 frontHalfAngle = 90 #degree to sample lidar
 errBuf = []
 bufLen = 10
-Kp=1.5
+Kp=1
 Ki=0
 Kd=0
 speed = 1.0
 peakWidThres = 5 #Minimum three degree width to be classify as a peak
-devCount = 20 #Deviation Counter
-devThres = 0.3 #Percentage threshold for cliff identification
-
+devCount = 45 #Deviation Counter
 
 ########################################################################################
 # Functions
@@ -76,7 +74,7 @@ def start():
     # FindFarDistAngle(samples)
 
 
-def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=10, devThres=0.4):
+def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=10):
     #Expect this input lidarSample = rc.lidar.get_samples()
     samples = np.array(lidarSample)
     angles = np.linspace(0, 360, len(samples)+1)[0:-1]
@@ -97,16 +95,15 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=10,
     # print("widths",widths)
     heights = samplesFront[peaks] #Find the depth of each peak
     # print("heights",heights)
-    spaces = widths*(heights)**2 #Find the space within each peak
+    spaces = widths*heights #Find the space within each peak
     # print("spaces",spaces)
     idxfarDist = peaks[np.argmax(spaces)]
     widfarDist = widths[np.argmax(spaces)]
     #Filter out large gradient
     idxfarDistLow = np.clip(idxfarDist-devCount,1,len(anglesFront)-2)
     idxfarDistHigh = np.clip(idxfarDist+devCount,1,len(anglesFront)-2)
-    meanDistLow = np.mean(samplesFront[idxfarDistLow:idxfarDist+1])#Average Left Peak Distance
-    meanDistHigh = np.mean(samplesFront[idxfarDist:idxfarDistHigh+1])#Average Right Peak Distance
-    minDist = np.min(samplesFront[1:len(anglesFront)-2])#Min Distance
+    meanDistLow = np.mean(samplesFront[idxfarDistLow:idxfarDist])#Average Left Peak Distance
+    meanDistHigh = np.mean(samplesFront[idxfarDist+1:idxfarDistHigh+1])#Average Right Peak Distance
     diffDistLowHigh = np.abs(meanDistLow-meanDistHigh)/np.max([meanDistLow,meanDistHigh]) #See if the difference is large
     print("diffDistLowHigh",diffDistLowHigh)
     #Compute Distance Weighted Angle
@@ -115,16 +112,8 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=10,
     #Smooth Cliffing
     if meanDistHigh>meanDistLow:
         farDistAng += (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*diffDistLowHigh
-        if minDist < 60:
-            print("Right")
-            print(((60-minDist)/60))
-            farDistAng += (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*((60-minDist)/60)
     else:
         farDistAng -= (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*diffDistLowHigh
-        if minDist < 60:
-            print("Left")
-            print(((60-minDist)/60))
-            farDistAng -= (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*((60-minDist)/60)
     print(farDistAng)
     return farDistAng
 
@@ -158,10 +147,10 @@ def PID(errN,errBuf,Kp=0,Ki=0,Kd=0,bufLen=10):
 # is pressed  
 def update():
     #Read gloabl parameters
-    global frontHalfAngle, errBuf, bufLen, Kp,Ki,Kd, speed, peakWidThres, devCount, devThres
+    global frontHalfAngle, errBuf, bufLen, Kp,Ki,Kd, speed, peakWidThres, devCount
     #Read Lidar Data
     samples = rc.lidar.get_samples()
-    farDistAng = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle,peakWidThres=peakWidThres, devCount=devCount, devThres=devThres)
+    farDistAng = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle,peakWidThres=peakWidThres, devCount=devCount)
     errAngN = farDistAng/frontHalfAngle #normalized error(-1,1) -(left) and +(right)
     #Feed into PID Angle Decision
     contAng = PID(errAngN,errBuf,Kp=Kp,Ki=Ki,Kd=Kd,bufLen=bufLen)
