@@ -44,6 +44,7 @@ import sys
 sys.path.insert(0, '../../library')
 import racecar_core
 import numpy as np
+import scipy.signal as signal
 
 ########################################################################################
 # Global variables
@@ -59,6 +60,7 @@ Kp=1
 Ki=0
 Kd=0
 speed = 1.0
+peakWidThres = 5 #Minimum three degree width to be classify as a peak
 
 
 ########################################################################################
@@ -70,14 +72,31 @@ def start():
     rc.drive.set_speed_angle(0, 0)
 
 
-def FindFarDistAngle(lidarSample,frontHalfAngle=90):
-    #lidarSample = rc.lidar.get_samples()
+def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5):
+    #Expect this input lidarSample = rc.lidar.get_samples()
     samples = np.array(lidarSample)
     angles = np.linspace(0, 360, len(samples)+1)[0:-1]
     samples[samples==0] = np.max(samples)
     samplesFront = np.concatenate((samples[angles>=(360-frontHalfAngle)],samples[angles<=frontHalfAngle]))
     anglesFront = np.concatenate((angles[angles>=(360-frontHalfAngle)]-360,angles[angles<=frontHalfAngle]))
-    farDistAng = np.sum(samplesFront*anglesFront)/np.sum(samplesFront)
+    ##Create a buffer for peak identification
+    samplesFront[0] = 0.0 #Create two notches at the edges for peak identification
+    samplesFront[-1] = 0.0
+    # Find the max distance angle
+    peaks, _ = signal.find_peaks(samplesFront,width=peakWidThres) #int List of indices for peak locations
+    widths = signal.peak_widths(samplesFront,peaks) #List of size of these peaks in degrees
+    widths = widths[0] #List of size of these peaks in degrees
+    peaks = np.array(peaks)
+    widths = np.array(widths)
+    # print("peaks",peaks)
+    # print("widths",widths)
+    heights = samplesFront[peaks] #Find the depth of each peak
+    # print("heights",heights)
+    spaces = widths*heights #Find the space within each peak
+    # print("spaces",spaces)
+    idxfarDist = peaks[np.argmax(spaces)]
+    farDistAng = anglesFront[idxfarDist]
+    # print(farDistAng)
     return farDistAng
 
 
@@ -110,12 +129,11 @@ def PID(errN,errBuf,Kp=0,Ki=0,Kd=0,bufLen=10):
 # is pressed  
 def update():
     #Read gloabl parameters
-    global frontHalfAngle, errBuf, bufLen, Kp,Ki,Kd, speed
+    global frontHalfAngle, errBuf, bufLen, Kp,Ki,Kd, speed, peakWidThres
     #Read Lidar Data
     samples = rc.lidar.get_samples()
-    farDistAng = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle)
+    farDistAng = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle,peakWidThres=peakWidThres)
     errAngN = farDistAng/frontHalfAngle #normalized error(-1,1) -(left) and +(right)
-    print("errAngle",errAngN)
     #Feed into PID Angle Decision
     contAng = PID(errAngN,errBuf,Kp=Kp,Ki=Ki,Kd=Kd,bufLen=bufLen)
     contAng = np.clip(contAng,-1,1)
