@@ -61,7 +61,7 @@ Ki=0
 Kd=0
 speed = 1.0
 peakWidThres = 5 #Minimum three degree width to be classify as a peak
-devCount = 40 #Deviation Counter
+devCount = 20 #Deviation Counter
 devThres = 0.6 #Percentage threshold for cliff identification
 
 
@@ -100,7 +100,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=10,
     spaces = widths*heights #Find the space within each peak
     # print("spaces",spaces)
     idxfarDist = peaks[np.argmax(spaces)]
-    # widfarDist = widths[np.argmax(spaces)]
+    widfarDist = widths[np.argmax(spaces)]
     #Filter out large gradient
     idxfarDistLow = np.clip(idxfarDist-devCount,0,len(anglesFront)-1)
     idxfarDistHigh = np.clip(idxfarDist+devCount,0,len(anglesFront)-1)
@@ -108,16 +108,23 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=10,
     meanDistHigh = np.mean(samplesFront[idxfarDist:idxfarDistHigh+1])#Average Right Peak Distance
     diffDistLowHigh = np.abs(meanDistLow-meanDistHigh)/np.max([meanDistLow,meanDistHigh]) #See if the difference is large
     print("diffDistLowHigh",diffDistLowHigh)
+    #Compute Distance Weighted Angle
+    print("Peak Width (deg)",widfarDist/2)
+    idxfarDistLowLarge = np.clip(idxfarDist-int(widfarDist/2),0,len(anglesFront)-1)
+    idxfarDistHighLarge = np.clip(idxfarDist+int(widfarDist/2),0,len(anglesFront)-1)
+    farDistAng = np.sum(anglesFront[idxfarDistLowLarge:idxfarDistHighLarge+1]*samplesFront[idxfarDistLowLarge:idxfarDistHighLarge+1])/np.sum(samplesFront[idxfarDistLowLarge:idxfarDistHighLarge+1])
     if diffDistLowHigh > devThres:
         print("Cliff!!!")
         if meanDistHigh>meanDistLow:
             # farDistAng = np.sum(anglesFront[idxfarDist:idxfarDistHigh+1]*samplesFront[idxfarDist:idxfarDistHigh+1])/np.sum(samplesFront[idxfarDist:idxfarDistHigh+1])
-            farDistAng = anglesFront[idxfarDistHigh]
+            # farDistAng = anglesFront[idxfarDistHigh]
+            farDistAng += (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])/2
         else:
             # farDistAng = np.sum(anglesFront[idxfarDistLow:idxfarDist+1]*samplesFront[idxfarDistLow:idxfarDist+1])/np.sum(samplesFront[idxfarDistLow:idxfarDist+1])
-            farDistAng = anglesFront[idxfarDistLow]
-    else:
-        farDistAng = anglesFront[idxfarDist]
+            # farDistAng = anglesFront[idxfarDistLow]
+            farDistAng -= (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])/2
+    # else:
+        # farDistAng = anglesFront[idxfarDist]
         # farDistAng = np.sum(anglesFront[idxfarDistLow:idxfarDistHigh+1]*samplesFront[idxfarDistLow:idxfarDistHigh+1])/np.sum(samplesFront[idxfarDistLow:idxfarDistHigh+1])
     print(farDistAng)
     return farDistAng
