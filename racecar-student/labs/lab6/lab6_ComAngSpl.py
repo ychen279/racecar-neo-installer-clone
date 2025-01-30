@@ -45,6 +45,7 @@ sys.path.insert(0, '../../library')
 import racecar_core
 import numpy as np
 import scipy.signal as signal
+from scipy.interpolate import CubicSpline as CS
 
 ########################################################################################
 # Global variables
@@ -53,7 +54,7 @@ import scipy.signal as signal
 rc = racecar_core.create_racecar()
 
 # Declare any global variables here
-frontHalfAngle = 125. #degree to sample lidar
+frontHalfAngle = 90. #degree to sample lidar
 errBuf = []
 bufLen = 10
 Kp=3.0
@@ -61,7 +62,7 @@ Ki=0
 Kd=0
 speed = 1.0
 peakWidThres = 5 #Minimum three degree width to be classify as a peak
-devCount = 30 #Deviation Counter or +- 22.5 deg deviation 
+devCount = 20 #Deviation Counter or +- 22.5 deg deviation 
 
 # Create a angle buffer
 angBufLen = 10 #Store the past five stamps' angles
@@ -78,8 +79,10 @@ def start():
     # FindFarDistAngle(samples)
 
 
-def FindFarDistAngle(lidarSample,frontHalfAngle=125., peakWidThres=5, devCount=30, angBuf=[0.0]*10):
+def FindFarDistAngle(lidarSample,frontHalfAngle=90., peakWidThres=5, devCount=20, angBuf=[0.0]*10):
     #Empty up the buffer angles
+    extrap = CS(np.array(range(len(angBuf))), np.array(angBuf),extrapolate=True)
+    angGusNext = np.clip(float(extrap(len(angBuf))),-frontHalfAngle,frontHalfAngle)
     angBuf.pop(0)
     #Expect this input lidarSample = rc.lidar.get_samples()
     samples = np.array(lidarSample)
@@ -94,8 +97,8 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=125., peakWidThres=5, devCount=3
     # Find the max distance angle
     idxPeaks, _ = signal.find_peaks(samplesFront,width=peakWidThres) #int List of indices for peak locations
     if len(idxPeaks)<=0: #Extrapolation Inertial Guidance
-        angBuf.append(np.mean(angBuf))
-        return np.mean(angBuf)
+        angBuf.append(angGusNext)
+        return angGusNext
     widPeaks = signal.peak_widths(samplesFront,idxPeaks)[0] #List of size of these peaks in degrees
     idxPeaks = np.array(idxPeaks)
     widPeaks = np.array(widPeaks) #This is actually effectively the index range (Not the angle)
@@ -129,6 +132,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=125., peakWidThres=5, devCount=3
     else:
         angMaxArcTune -= 0.5*devAngle*difDisMaxArc
     # Update the angle buffer
+    angMaxArcTune = 0.5*(angMaxArcTune+angGusNext)
     angBuf.append(angMaxArcTune)
     # printing
     print("angle buffer",angBuf)
@@ -140,7 +144,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=125., peakWidThres=5, devCount=3
     print("angMaxArc Untuned",anglesFront[idxMaxArc])
     print("Cliff Difference",difDisMaxArc)
     print("angMaxArc Tuned",angMaxArcTune)
-    return np.mean(angBuf)
+    return angMaxArcTune
 
 
 def PID(errN,errBuf,Kp=0,Ki=0,Kd=0,bufLen=10):
