@@ -130,6 +130,8 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=125., peakWidThres=5, devCount=1
         angMaxArcTune -= devAngle*difDisMaxArc
     # Update the angle buffer
     angBuf.append(angMaxArcTune)
+    angMaxArcTune = np.mean(angBuf)
+    angBuf[-1] = angMaxArcTune
     # printing
     print("angle buffer",angBuf)
     print("idxPeaks",idxPeaks)
@@ -140,7 +142,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=125., peakWidThres=5, devCount=1
     print("angMaxArc Untuned",anglesFront[idxMaxArc])
     print("Cliff Difference",difDisMaxArc)
     print("angMaxArc Tuned",angMaxArcTune)
-    return np.mean(angBuf)
+    return angMaxArcTune
 
 
 def PID(errN,errBuf,Kp=0,Ki=0,Kd=0,bufLen=10):
