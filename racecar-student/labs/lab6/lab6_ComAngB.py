@@ -54,15 +54,15 @@ rc = racecar_core.create_racecar()
 
 # Declare any global variables here
 angTarIni = 0.0 #Initial or Last Time Step Target Angle
-frontHalfAngle = 90 #degree to sample lidar
+frontHalfAngle = 135 #degree to sample lidar
 errBuf = []
 bufLen = 10
-Kp=1.0
-Ki=0.0
-Kd=0.0
+Kp=3.0
+Ki=0
+Kd=0
 speed = 1.0
 peakWidThres = 5 #Minimum three degree width to be classify as a peak
-devCount = 15 #Deviation Counter or +- 22.5 deg deviation 
+devCount = 20 #Deviation Counter or +- 22.5 deg deviation 
 
 ########################################################################################
 # Functions
@@ -75,7 +75,7 @@ def start():
     FindFarDistAngle(samples)
 
 
-def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=15, angPre=0.0):
+def FindFarDistAngle(lidarSample,frontHalfAngle=135, peakWidThres=5, devCount=20, angPre=0.0):
     #Expect this input lidarSample = rc.lidar.get_samples()
     samples = np.array(lidarSample)
     angles = np.linspace(0, 360, len(samples)+1)[0:-1]
