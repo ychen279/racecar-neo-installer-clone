@@ -53,7 +53,7 @@ import scipy.signal as signal
 rc = racecar_core.create_racecar()
 
 # Declare any global variables here
-frontHalfAngle = 90. #degree to sample lidar
+frontHalfAngle = 125. #degree to sample lidar
 errBuf = []
 bufLen = 10
 Kp=3.0
@@ -61,10 +61,10 @@ Ki=0
 Kd=0
 speed = 1.0
 peakWidThres = 5 #Minimum three degree width to be classify as a peak
-devCount = 20 #Deviation Counter or +- 22.5 deg deviation 
+devCount = 15 #Deviation Counter or +- 22.5 deg deviation 
 
 # Create a angle buffer
-angBufLen = 5 #Store the past five stamps' angles
+angBufLen = 10 #Store the past five stamps' angles
 angBuf = [0.0]*angBufLen
 
 ########################################################################################
@@ -78,7 +78,7 @@ def start():
     FindFarDistAngle(samples)
 
 
-def FindFarDistAngle(lidarSample,frontHalfAngle=90., peakWidThres=5, devCount=20, angBuf=[0.0]*5):
+def FindFarDistAngle(lidarSample,frontHalfAngle=125., peakWidThres=5, devCount=15, angBuf=[0.0]*10):
     #Empty up the buffer angles
     angBuf.pop(0)
     #Expect this input lidarSample = rc.lidar.get_samples()
