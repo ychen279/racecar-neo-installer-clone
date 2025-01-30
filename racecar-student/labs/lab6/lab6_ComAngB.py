@@ -104,7 +104,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=15,
     arcLenPeaks = np.array(arcLenPeaks)
     # Compute angle weighting
     angWeis = 1-np.abs(angPre-angPeaks)/(2*frontHalfAngle)
-    arcLenPeaksWeighted = np.power(arcLenPeaks,1+angWeis)
+    arcLenPeaksWeighted = arcLenPeaks*(1+angWeis)
     # Determine a good angle to go with
     idxMaxArc =  idxPeaks[np.argmax(arcLenPeaksWeighted)] #index of maximum arc length
     widMaxArc =  int(widPeaks[np.argmax(arcLenPeaksWeighted)]) #number of indices across maximum arc length
