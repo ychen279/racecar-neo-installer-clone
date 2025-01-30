@@ -41,7 +41,7 @@ import sys
 
 # If this file is nested inside a folder in the labs folder, the relative path should
 # be [1, ../../library] instead.
-sys.path.insert(0, '../library')
+sys.path.insert(0, '../../library')
 import racecar_core
 import numpy as np
 import scipy.signal as signal
@@ -56,12 +56,12 @@ rc = racecar_core.create_racecar()
 frontHalfAngle = 90 #degree to sample lidar
 errBuf = []
 bufLen = 10
-Kp=0.9
-Ki=0.05
-Kd=0.8
-speed = 0.9
+Kp=1.0
+Ki=0.0
+Kd=0.0
+speed = 1.0
 peakWidThres = 5 #Minimum three degree width to be classify as a peak
-devCount = 45 #Deviation Counter
+devCount = 45 #Deviation Counter or +- 22.5 deg deviation 
 
 ########################################################################################
 # Functions
@@ -70,8 +70,8 @@ devCount = 45 #Deviation Counter
 # [FUNCTION] The start function is run once every time the start button is pressed
 def start():
     rc.drive.set_speed_angle(0, 0)
-    # samples = rc.lidar.get_samples()
-    # FindFarDistAngle(samples)
+    samples = rc.lidar.get_samples()
+    FindFarDistAngle(samples)
 
 
 def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=45):
@@ -79,48 +79,63 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=45)
     samples = np.array(lidarSample)
     angles = np.linspace(0, 360, len(samples)+1)[0:-1]
     if len(samples[samples==0])>0:
-        samples[samples==0] = np.max(samples)
+        samples[samples==0] = np.max(samples) #Set undetective region to maximum distance
     samplesFront = np.concatenate((samples[angles>=(360-frontHalfAngle)],samples[angles<=frontHalfAngle]))
     anglesFront = np.concatenate((angles[angles>=(360-frontHalfAngle)]-360,angles[angles<=frontHalfAngle]))
-    ##Create a buffer for peak identification
-    samplesFront[0] = 0.0 #Create two notches at the edges for peak identification
-    samplesFront[-1] = 0.0
+    # Create a buffer for peak identification
+    samplesFront[0] *= 0.98 #Create two notches at the edges for peak identification
+    samplesFront[-1] *= 0.98
     # Find the max distance angle
-    # print("samplesFront",samplesFront)
-    peaks, _ = signal.find_peaks(samplesFront,width=peakWidThres) #int List of indices for peak locations
-    widths = signal.peak_widths(samplesFront,peaks) #List of size of these peaks in degrees
-    widths = widths[0] #List of size of these peaks in degrees
-    peaks = np.array(peaks)
-    widths = np.array(widths)
-    # print("peaks",peaks)
-    print("widths---------------",np.round(widths))
-    heights = samplesFront[peaks] #Find the depth of each peak
-    print("heights--------------------------------------------",np.round(heights))
-    print("Angles",np.round(anglesFront[peaks]))
-    spaces = widths*heights**2 #Find the space within each peak
-    # print("spaces",np.round(spaces))
-    idxfarDist = peaks[np.argmax(spaces)]
-    widfarDist = widths[np.argmax(spaces)]
-    #Filter out large gradient
-    idxfarDistLow = np.clip(idxfarDist-devCount,1,len(anglesFront)-2)
-    idxfarDistHigh = np.clip(idxfarDist+devCount,1,len(anglesFront)-2)
-    meanDistLow = np.mean(samplesFront[idxfarDistLow:idxfarDist])#Average Left Peak Distance
-    meanDistHigh = np.mean(samplesFront[idxfarDist+1:idxfarDistHigh+1])#Average Right Peak Distance
-    if np.max([meanDistLow,meanDistHigh]) > 0.0:
-        diffDistLowHigh = np.abs(meanDistLow-meanDistHigh)/np.max([meanDistLow,meanDistHigh]) #See if the difference is large
+    idxPeaks, _ = signal.find_peaks(samplesFront,width=peakWidThres) #int List of indices for peak locations
+    if len(idxPeaks)<=0: #No Update
+        return None
+    widPeaks = signal.peak_widths(samplesFront,idxPeaks)[0] #List of size of these peaks in degrees
+    idxPeaks = np.array(idxPeaks)
+    widPeaks = np.array(widPeaks) #This is actually effectively the index range (Not the angle)
+    disPeaks = samplesFront[idxPeaks]
+    angPeaks = anglesFront[idxPeaks]
+    # Integrate arcLength of each peak
+    idxRanPeaksLow = np.clip((idxPeaks - 0.5*widPeaks).astype(int),0,len(anglesFront)-1)
+    idxRanPeaksHig = np.clip((idxPeaks + 0.5*widPeaks).astype(int),0,len(anglesFront)-1)
+    arcLenPeaks = []
+    for i in range(len(idxRanPeaksLow)):
+        arcLenPeaks.append(np.sum(samplesFront[idxRanPeaksLow[i]:idxRanPeaksHig[i]+1])*(2*np.pi/len(angles))) #cm
+    arcLenPeaks = np.array(arcLenPeaks)
+    # Compute angle weighting
+    angWeis = 1-np.abs(angPeaks)/frontHalfAngle
+    arcLenPeaksWeighted = np.power(arcLenPeaks,1+angWeis)
+    # Determine a good angle to go with
+    idxMaxArc =  idxPeaks[np.argmax(arcLenPeaksWeighted)] #index of maximum arc length
+    widMaxArc =  int(widPeaks[np.argmax(arcLenPeaksWeighted)]) #number of indices across maximum arc length
+    # Determine discontinuity around the max arc
+    idxRanMaxArcLow = np.clip(idxMaxArc-devCount,0,len(anglesFront)-1)
+    idxRanMaxArcHig = np.clip(idxMaxArc+devCount,0,len(anglesFront)-1)
+    disMaxArcLow = np.mean(samplesFront[idxRanMaxArcLow:idxMaxArc]) #Average Left Peak Distance
+    disMaxArcHig = np.mean(samplesFront[idxMaxArc+1:idxRanMaxArcHig+1])#Average Right Peak Distance
+    # Compute percentage discontinuity
+    if np.max([disMaxArcLow,disMaxArcHig]) > 0.0:
+        difDisMaxArc = np.abs(disMaxArcLow-disMaxArcHig)/np.max([disMaxArcLow,disMaxArcHig]) #(0,1) if 1 for very stiff cliff
     else:
-        diffDistLowHigh = 0.0 #Default no difference
-    # print("diffDistLowHigh",diffDistLowHigh)
-    #Compute Distance Weighted Angle
-    # print("Peak Width (deg)",widfarDist/2)
-    farDistAng = anglesFront[idxfarDist]
-    #Smooth Cliffing
-    if meanDistHigh>meanDistLow:
-        farDistAng += (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*diffDistLowHigh
+        difDisMaxArc = 0.0 #Default no difference
+    # Compute final angle requirement
+    angMaxArcTune = anglesFront[idxMaxArc]
+    devAngle = anglesFront[idxRanMaxArcHig]-anglesFront[idxRanMaxArcLow]
+    if disMaxArcHig>disMaxArcLow: #Apply cliffing correction
+        angMaxArcTune += devAngle*difDisMaxArc
     else:
-        farDistAng -= (anglesFront[idxfarDistHigh]-anglesFront[idxfarDistLow])*diffDistLowHigh
-    print(farDistAng)
-    return farDistAng
+        angMaxArcTune -= devAngle*difDisMaxArc
+    # printing
+    print("idxPeaks",idxPeaks)
+    print("widPeaks",widPeaks)
+    print("disPeaks",disPeaks)
+    print("angPeaks",angPeaks)
+    print("arcLenPeaks",arcLenPeaks)
+    print("angWeis",angWeis)
+    print("arcLenPeaksWeighted",arcLenPeaksWeighted)
+    print("angMaxArc Untuned",anglesFront[idxMaxArc])
+    print("Cliff Difference",difDisMaxArc)
+    print("angMaxArc Tuned",angMaxArcTune)
+    return angMaxArcTune
 
 
 def PID(errN,errBuf,Kp=0,Ki=0,Kd=0,bufLen=10):
@@ -152,18 +167,20 @@ def PID(errN,errBuf,Kp=0,Ki=0,Kd=0,bufLen=10):
 # is pressed  
 def update():
     #Read gloabl parameters
-    global frontHalfAngle, errBuf, bufLen, Kp,Ki,Kd, speed, peakWidThres, devCount
+    global frontHalfAngle, errBuf, bufLen, Kp, Ki, Kd, speed, peakWidThres, devCount
     #Read Lidar Data
     samples = rc.lidar.get_samples()
-    farDistAng = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle,peakWidThres=peakWidThres, devCount=devCount)
-    errAngN = farDistAng/frontHalfAngle #normalized error(-1,1) -(left) and +(right)
+    angTar = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle,peakWidThres=peakWidThres, devCount=devCount)
+    if angTar is None:
+        return 0
+    else:
+        errAngN = angTar/frontHalfAngle #normalized error(-1,1) -(left) and +(right)
     #Feed into PID Angle Decision
     contAng = PID(errAngN,errBuf,Kp=Kp,Ki=Ki,Kd=Kd,bufLen=bufLen)
     contAng = np.clip(contAng,-1,1)
-    speedUse = speed - 0.4*np.abs(contAng)
     #Implement Action
-    rc.drive.set_speed_angle(speedUse, contAng)
-    # pass
+    rc.drive.set_speed_angle(speed, contAng)
+    return 0
 
 # [FUNCTION] update_slow() is similar to update() but is called once per second by
 # default. It is especially useful for printing debug messages, since printing a 
