@@ -61,7 +61,7 @@ Ki=0
 Kd=0
 speed = 1.0
 peakWidThres = 5 #Minimum three degree width to be classify as a peak
-devCount = 15 #Deviation Counter or +- 22.5 deg deviation 
+devCount = 30 #Deviation Counter or +- 22.5 deg deviation 
 
 # Create a angle buffer
 angBufLen = 10 #Store the past five stamps' angles
@@ -74,11 +74,11 @@ angBuf = [0.0]*angBufLen
 # [FUNCTION] The start function is run once every time the start button is pressed
 def start():
     rc.drive.set_speed_angle(0, 0)
-    samples = rc.lidar.get_samples()
-    FindFarDistAngle(samples)
+    # samples = rc.lidar.get_samples()
+    # FindFarDistAngle(samples)
 
 
-def FindFarDistAngle(lidarSample,frontHalfAngle=125., peakWidThres=5, devCount=15, angBuf=[0.0]*10):
+def FindFarDistAngle(lidarSample,frontHalfAngle=125., peakWidThres=5, devCount=30, angBuf=[0.0]*10):
     #Empty up the buffer angles
     angBuf.pop(0)
     #Expect this input lidarSample = rc.lidar.get_samples()
@@ -125,9 +125,9 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=125., peakWidThres=5, devCount=1
     angMaxArcTune = anglesFront[idxMaxArc]
     devAngle = anglesFront[idxRanMaxArcHig]-anglesFront[idxRanMaxArcLow]
     if disMaxArcHig>disMaxArcLow: #Apply cliffing correction
-        angMaxArcTune += devAngle*difDisMaxArc
+        angMaxArcTune += 0.5*devAngle*difDisMaxArc
     else:
-        angMaxArcTune -= devAngle*difDisMaxArc
+        angMaxArcTune -= 0.5*devAngle*difDisMaxArc
     # Update the angle buffer
     angBuf.append(angMaxArcTune)
     # printing
