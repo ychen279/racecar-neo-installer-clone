@@ -53,6 +53,7 @@ import scipy.signal as signal
 rc = racecar_core.create_racecar()
 
 # Declare any global variables here
+angTarIni = 0.0 #Initial or Last Time Step Target Angle
 frontHalfAngle = 90 #degree to sample lidar
 errBuf = []
 bufLen = 10
@@ -74,7 +75,7 @@ def start():
     FindFarDistAngle(samples)
 
 
-def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=45):
+def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=45, angPre=0.0):
     #Expect this input lidarSample = rc.lidar.get_samples()
     samples = np.array(lidarSample)
     angles = np.linspace(0, 360, len(samples)+1)[0:-1]
@@ -88,7 +89,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=45)
     # Find the max distance angle
     idxPeaks, _ = signal.find_peaks(samplesFront,width=peakWidThres) #int List of indices for peak locations
     if len(idxPeaks)<=0: #No Update
-        return None
+        return angPre
     widPeaks = signal.peak_widths(samplesFront,idxPeaks)[0] #List of size of these peaks in degrees
     idxPeaks = np.array(idxPeaks)
     widPeaks = np.array(widPeaks) #This is actually effectively the index range (Not the angle)
@@ -102,7 +103,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=45)
         arcLenPeaks.append(np.sum(samplesFront[idxRanPeaksLow[i]:idxRanPeaksHig[i]+1])*(2*np.pi/len(angles))) #cm
     arcLenPeaks = np.array(arcLenPeaks)
     # Compute angle weighting
-    angWeis = 1-np.abs(angPeaks)/frontHalfAngle
+    angWeis = 1-np.abs(angPre-angPeaks)/(2*frontHalfAngle)
     arcLenPeaksWeighted = np.power(arcLenPeaks,1+angWeis)
     # Determine a good angle to go with
     idxMaxArc =  idxPeaks[np.argmax(arcLenPeaksWeighted)] #index of maximum arc length
@@ -167,15 +168,14 @@ def PID(errN,errBuf,Kp=0,Ki=0,Kd=0,bufLen=10):
 # is pressed  
 def update():
     #Read gloabl parameters
-    global frontHalfAngle, errBuf, bufLen, Kp, Ki, Kd, speed, peakWidThres, devCount
+    global angTarIni, frontHalfAngle, errBuf, bufLen, Kp, Ki, Kd, speed, peakWidThres, devCount
     #Read Lidar Data
     samples = rc.lidar.get_samples()
-    angTar = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle,peakWidThres=peakWidThres, devCount=devCount)
-    if angTar is None:
-        return 0
-    else:
-        errAngN = angTar/frontHalfAngle #normalized error(-1,1) -(left) and +(right)
+    #Find Target Angle
+    angTar = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle,peakWidThres=peakWidThres, devCount=devCount, angPre=angTarIni)
+    angTarIni = angTar
     #Feed into PID Angle Decision
+    errAngN = angTar/frontHalfAngle #normalized error(-1,1) -(left) and +(right)
     contAng = PID(errAngN,errBuf,Kp=Kp,Ki=Ki,Kd=Kd,bufLen=bufLen)
     contAng = np.clip(contAng,-1,1)
     #Implement Action
