@@ -45,7 +45,6 @@ sys.path.insert(0, '../../library')
 import racecar_core
 import numpy as np
 import scipy.signal as signal
-from scipy.interpolate import CubicSpline as CS
 
 ########################################################################################
 # Global variables
@@ -67,7 +66,6 @@ devCount = 20 #Deviation Counter or +- 22.5 deg deviation
 # Create a angle buffer
 angBufLen = 5 #Store the past five stamps' angles
 angBuf = [0.0]*angBufLen
-angTurnLook = 45. #degree(Maximum turning for searching)
 
 ########################################################################################
 # Functions
@@ -80,28 +78,24 @@ def start():
     FindFarDistAngle(samples)
 
 
-def FindFarDistAngle(lidarSample,frontHalfAngle=90., peakWidThres=5, devCount=20, angBuf=[0.0]*5, angTurnLook=45.):
-    #Prediction of next angle through extrapolation
-    extrap = CS(np.array(range(len(angBuf))), np.array(angBuf),extrapolate=True)
-    angGusNext = np.clip(float(extrap(len(angBuf))),-frontHalfAngle-angTurnLook,frontHalfAngle+angTurnLook)
-    angBuf.pop(0) #Empty up a space for the current time step
-    #Compute turning of the searching angle
-    angTurnLook_Cur = angTurnLook*(angGusNext/(frontHalfAngle+angTurnLook)) #[deg]
+def FindFarDistAngle(lidarSample,frontHalfAngle=90., peakWidThres=5, devCount=20, angBuf=[0.0]*5):
+    #Empty up the buffer angles
+    angBuf.pop(0)
     #Expect this input lidarSample = rc.lidar.get_samples()
     samples = np.array(lidarSample)
     angles = np.linspace(0, 360, len(samples)+1)[0:-1]
     if len(samples[samples==0])>0:
         samples[samples==0] = np.max(samples) #Set undetective region to maximum distance
-    samplesFront = np.concatenate((samples[angles>=(360-frontHalfAngle+angTurnLook_Cur)],samples[angles<=(frontHalfAngle+angTurnLook_Cur)]))
-    anglesFront = np.concatenate((angles[angles>=(360-frontHalfAngle+angTurnLook_Cur)]-360,angles[angles<=(frontHalfAngle+angTurnLook_Cur)]))
+    samplesFront = np.concatenate((samples[angles>=(360-frontHalfAngle)],samples[angles<=(frontHalfAngle)]))
+    anglesFront = np.concatenate((angles[angles>=(360-frontHalfAngle)]-360,angles[angles<=(frontHalfAngle)]))
     # Create a buffer for peak identification
     samplesFront[0] *= 0.98 #Create two notches at the edges for peak identification
     samplesFront[-1] *= 0.98
     # Find the max distance angle
     idxPeaks, _ = signal.find_peaks(samplesFront,width=peakWidThres) #int List of indices for peak locations
     if len(idxPeaks)<=0: #Extrapolation Inertial Guidance
-        angBuf.append(angGusNext)
-        return angGusNext
+        angBuf.append(np.mean(angBuf))
+        return np.mean(angBuf)
     widPeaks = signal.peak_widths(samplesFront,idxPeaks)[0] #List of size of these peaks in degrees
     idxPeaks = np.array(idxPeaks)
     widPeaks = np.array(widPeaks) #This is actually effectively the index range (Not the angle)
@@ -114,12 +108,9 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90., peakWidThres=5, devCount=20
     for i in range(len(idxRanPeaksLow)):
         arcLenPeaks.append(np.sum(samplesFront[idxRanPeaksLow[i]:idxRanPeaksHig[i]+1])*(2*np.pi/len(angles))) #cm
     arcLenPeaks = np.array(arcLenPeaks)
-    # Compute angle weighting
-    angWeis = 1-np.abs(angGusNext-angPeaks)/(2*(frontHalfAngle+angTurnLook))
-    arcLenPeaksWeighted = arcLenPeaks*(1+angWeis)
     # Determine a good angle to go with
-    idxMaxArc =  idxPeaks[np.argmax(arcLenPeaksWeighted)] #index of maximum arc length
-    widMaxArc =  int(widPeaks[np.argmax(arcLenPeaksWeighted)]) #number of indices across maximum arc length
+    idxMaxArc =  idxPeaks[np.argmax(arcLenPeaks)] #index of maximum arc length
+    widMaxArc =  int(widPeaks[np.argmax(arcLenPeaks)]) #number of indices across maximum arc length
     # Determine discontinuity around the max arc
     idxRanMaxArcLow = np.clip(idxMaxArc-devCount,0,len(anglesFront)-1)
     idxRanMaxArcHig = np.clip(idxMaxArc+devCount,0,len(anglesFront)-1)
@@ -141,19 +132,15 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90., peakWidThres=5, devCount=20
     angBuf.append(angMaxArcTune)
     # printing
     print("angle buffer",angBuf)
-    print("guessed angle next",angGusNext)
-    print("angTurnLook_Cur",angTurnLook_Cur)
     print("idxPeaks",idxPeaks)
     print("widPeaks",widPeaks)
     print("disPeaks",disPeaks)
     print("angPeaks",angPeaks)
     print("arcLenPeaks",arcLenPeaks)
-    print("angWeis",angWeis)
-    print("arcLenPeaksWeighted",arcLenPeaksWeighted)
     print("angMaxArc Untuned",anglesFront[idxMaxArc])
     print("Cliff Difference",difDisMaxArc)
     print("angMaxArc Tuned",angMaxArcTune)
-    return angMaxArcTune
+    return np.mean(angBuf)
 
 
 def PID(errN,errBuf,Kp=0,Ki=0,Kd=0,bufLen=10):
@@ -185,13 +172,13 @@ def PID(errN,errBuf,Kp=0,Ki=0,Kd=0,bufLen=10):
 # is pressed  
 def update():
     #Read gloabl parameters
-    global frontHalfAngle, errBuf, bufLen, Kp, Ki, Kd, speed, peakWidThres, devCount, angBuf, angTurnLook
+    global frontHalfAngle, errBuf, bufLen, Kp, Ki, Kd, speed, peakWidThres, devCount, angBuf
     #Read Lidar Data
     samples = rc.lidar.get_samples()
     #Find Target Angle
-    angTar = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle,peakWidThres=peakWidThres, devCount=devCount, angBuf=angBuf, angTurnLook=angTurnLook)
+    angTar = FindFarDistAngle(samples,frontHalfAngle=frontHalfAngle,peakWidThres=peakWidThres, devCount=devCount, angBuf=angBuf)
     #Feed into PID Angle Decision
-    errAngN = angTar/(frontHalfAngle+angTurnLook) #normalized error(-1,1) -(left) and +(right)
+    errAngN = angTar/(frontHalfAngle) #normalized error(-1,1) -(left) and +(right)
     contAng = PID(errAngN,errBuf,Kp=Kp,Ki=Ki,Kd=Kd,bufLen=bufLen)
     contAng = np.clip(contAng,-1,1)
     #Implement Action
