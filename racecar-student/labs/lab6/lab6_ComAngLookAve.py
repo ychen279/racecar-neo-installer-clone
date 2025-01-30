@@ -45,7 +45,6 @@ sys.path.insert(0, '../../library')
 import racecar_core
 import numpy as np
 import scipy.signal as signal
-from scipy.interpolate import CubicSpline as CS
 
 ########################################################################################
 # Global variables
@@ -82,8 +81,7 @@ def start():
 
 def FindFarDistAngle(lidarSample,frontHalfAngle=90., peakWidThres=5, devCount=20, angBuf=[0.0]*5, angTurnLook=45.):
     #Prediction of next angle through extrapolation
-    extrap = CS(np.array(range(len(angBuf))), np.array(angBuf),extrapolate=True)
-    angGusNext = np.clip(float(extrap(len(angBuf))),-frontHalfAngle-angTurnLook,frontHalfAngle+angTurnLook)
+    angGusNext = np.clip(np.mean(angBuf),-frontHalfAngle-angTurnLook,frontHalfAngle+angTurnLook)
     angBuf.pop(0) #Empty up a space for the current time step
     #Compute turning of the searching angle
     angTurnLook_Cur = angTurnLook*(angGusNext/(frontHalfAngle+angTurnLook)) #[deg]
