@@ -62,7 +62,7 @@ Ki=0.0
 Kd=0.0
 speed = 1.0
 peakWidThres = 5 #Minimum three degree width to be classify as a peak
-devCount = 45 #Deviation Counter or +- 22.5 deg deviation 
+devCount = 15 #Deviation Counter or +- 22.5 deg deviation 
 
 ########################################################################################
 # Functions
@@ -75,7 +75,7 @@ def start():
     FindFarDistAngle(samples)
 
 
-def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=45, angPre=0.0):
+def FindFarDistAngle(lidarSample,frontHalfAngle=90, peakWidThres=5, devCount=15, angPre=0.0):
     #Expect this input lidarSample = rc.lidar.get_samples()
     samples = np.array(lidarSample)
     angles = np.linspace(0, 360, len(samples)+1)[0:-1]
