@@ -107,13 +107,26 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=100, peakWidThres=10, devCount=5
     disPeaks = samplesFront[idxPeaks]
     angPeaks = anglesFront[idxPeaks]
     # Integrate arcLength of each peak
-    arcLenPeaks = widPeaks*disPeaks
+    arcLenPeaks = disPeaks
     # Compute angle weighting
     angWeis = 1-np.abs(angGusNext-angPeaks)/(2*(frontHalfAngle+angTurnLook))
     arcLenPeaksWeighted = arcLenPeaks*(1+angWeis)
+    # Cliff scan
+    idxClifScanLow = np.clip((idxPeaks - devCount).astype(int),0,len(anglesFront)-1)
+    idxClifScanHig = np.clip((idxPeaks + devCount).astype(int),0,len(anglesFront)-1)
+    difClifScan = []
+    for i in range(len(idxClifScanLow)):
+        disClifScanLow = np.mean(samplesFront[idxClifScanLow[i]:idxPeaks[i]])
+        disClifScanHig = np.mean(samplesFront[idxPeaks[i]+1:idxClifScanHig[i]+1])
+        difClifScan.append(np.abs(disClifScanLow-disClifScanHig))
+        # if np.max([disClifScanLow,disClifScanHig]) > 0.0:
+        #     difClifScan.append(   np.abs(disClifScanLow-disClifScanHig)/np.max([disClifScanLow,disClifScanHig])   )
+    difClifScan = np.array(difClifScan)
+    difClifScan = difClifScan/np.max(difClifScan)
+    arcLenPeaksCliffed = arcLenPeaksWeighted*(1+difClifScan)
     # Determine a good angle to go with
-    idxMaxArc =  idxPeaks[np.argmax(arcLenPeaksWeighted)] #index of maximum arc length
-    widMaxArc =  int(widPeaks[np.argmax(arcLenPeaksWeighted)]) #number of indices across maximum arc length
+    idxMaxArc =  idxPeaks[np.argmax(arcLenPeaksCliffed)] #index of maximum arc length
+    widMaxArc =  int(widPeaks[np.argmax(arcLenPeaksCliffed)]) #number of indices across maximum arc length
     # Determine discontinuity around the max arc
     idxZero = np.where((anglesFront>-1)&(anglesFront<1))[0][0]
     idxRanMaxArcLow = np.clip(idxZero-devCount,0,len(anglesFront)-1)
@@ -145,6 +158,8 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=100, peakWidThres=10, devCount=5
     print("arcLenPeaks",arcLenPeaks)
     print("angWeis",angWeis)
     print("arcLenPeaksWeighted",arcLenPeaksWeighted)
+    print("difClifScan",difClifScan)
+    print("arcLenPeaksCliffed",arcLenPeaksCliffed)
     print("angMaxArc Untuned",anglesFront[idxMaxArc])
     print("Cliff Difference",difDisMaxArc)
     print("angMaxArc Tuned",angMaxArcTune)
