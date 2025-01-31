@@ -75,11 +75,11 @@ angTurnLook = 40 #10. #degree(Maximum turning for searching)
 # [FUNCTION] The start function is run once every time the start button is pressed
 def start():
     rc.drive.set_speed_angle(0, 0)
-    samples = rc.lidar.get_samples()
-    FindFarDistAngle(samples)
+    # samples = rc.lidar.get_samples()
+    # FindFarDistAngle(samples)
 
 
-def FindFarDistAngle(lidarSample,frontHalfAngle=90., peakWidThres=5, devCount=20, angBuf=[0.0]*5, angTurnLook=45.):
+def FindFarDistAngle(lidarSample,frontHalfAngle=100, peakWidThres=10, devCount=5, angBuf=[0.0]*5, angTurnLook=40):
     #Prediction of next angle through extrapolation
     angGusNext = np.clip(np.mean(angBuf),-frontHalfAngle-angTurnLook,frontHalfAngle+angTurnLook)
     angBuf.pop(0) #Empty up a space for the current time step
@@ -89,10 +89,8 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90., peakWidThres=5, devCount=20
     samples = np.array(lidarSample)
     angles = np.linspace(0, 360, len(samples)+1)[0:-1]
     if len(samples[samples==0])>0:
-        y = np.where(samples != 0, samples, np.nan)  # Replace zeros with NaN
-        mask = np.isnan(y)
-        y[mask] = np.interp(angles[mask], angles[~mask], angles[~mask])
-        samples = y #Set undetective region to maximum distance
+        yisNaN_mask = np.isnan(np.where(samples != 0, samples, np.nan))  # Replace zeros with NaN
+        samples[yisNaN_mask] = np.interp(angles[yisNaN_mask], angles[~yisNaN_mask], samples[~yisNaN_mask])
     samplesFront = np.concatenate((samples[angles>=(360-frontHalfAngle+angTurnLook_Cur)],samples[angles<=(frontHalfAngle+angTurnLook_Cur)]))
     anglesFront = np.concatenate((angles[angles>=(360-frontHalfAngle+angTurnLook_Cur)]-360,angles[angles<=(frontHalfAngle+angTurnLook_Cur)]))
     # Create a buffer for peak identification
@@ -108,25 +106,8 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90., peakWidThres=5, devCount=20
     widPeaks = np.array(widPeaks) #This is actually effectively the index range (Not the angle)
     disPeaks = samplesFront[idxPeaks]
     angPeaks = anglesFront[idxPeaks]
-    ######### In production fix S
-    """
-    maskKill = (disPeaks>6200) #(widPeaks>50)|
-    widPeaks[maskKill] = 1.0
-    disPeaks[maskKill] = 1.0
-    """
-    ######### In production fix E
     # Integrate arcLength of each peak
-    ######### In production fix S
-    """
-    idxRanPeaksLow = np.clip((idxPeaks - 0.5*widPeaks).astype(int),0,len(anglesFront)-1)
-    idxRanPeaksHig = np.clip((idxPeaks + 0.5*widPeaks).astype(int),0,len(anglesFront)-1)
-    arcLenPeaks = []
-    for i in range(len(idxRanPeaksLow)):
-        arcLenPeaks.append(np.sum(samplesFront[idxRanPeaksLow[i]:idxRanPeaksHig[i]+1])*(2*np.pi/len(angles))) #cm
-    arcLenPeaks = np.array(arcLenPeaks)
-    """
     arcLenPeaks = widPeaks*disPeaks
-    ######### In production fix E
     # Compute angle weighting
     angWeis = 1-np.abs(angGusNext-angPeaks)/(2*(frontHalfAngle+angTurnLook))
     arcLenPeaksWeighted = arcLenPeaks*(1+angWeis)
@@ -137,12 +118,8 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=90., peakWidThres=5, devCount=20
     idxZero = np.where((anglesFront>-1)&(anglesFront<1))[0][0]
     idxRanMaxArcLow = np.clip(idxZero-devCount,0,len(anglesFront)-1)
     idxRanMaxArcHig = np.clip(idxZero+devCount,0,len(anglesFront)-1)
-    ######### In production fix S
-    # disMaxArcLow = np.mean(samplesFront[idxRanMaxArcLow:idxZero]) #Average Left Peak Distance
-    # disMaxArcHig = np.mean(samplesFront[idxZero+1:idxRanMaxArcHig+1])#Average Right Peak Distance
     disMaxArcLow = np.mean(samplesFront[0:idxZero]) #Average Left Peak Distance
     disMaxArcHig = np.mean(samplesFront[idxZero+1:])#Average Right Peak Distance
-    ######### In production fix E
     # Compute percentage discontinuity
     if np.max([disMaxArcLow,disMaxArcHig]) > 0.0:
         difDisMaxArc = np.abs(disMaxArcLow-disMaxArcHig)/np.max([disMaxArcLow,disMaxArcHig]) #(0,1) if 1 for very stiff cliff
