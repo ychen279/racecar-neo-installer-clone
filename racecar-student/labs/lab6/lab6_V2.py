@@ -91,7 +91,7 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=100., peakWidThres=5, devSearchC
     samples = np.array(lidarSample)
     angles = np.linspace(0, 360, len(samples)+1)[0:-1]
     #Clean up the no data region
-    if len(np.sum(samples==0))>0:
+    if np.sum(samples==0)>0:
         isnan_mask = np.isnan(np.where(samples != 0, samples, np.nan))  # Replace zeros with NaN
         samples[isnan_mask] = np.interp(angles[isnan_mask], angles[~isnan_mask], samples[~isnan_mask])
     #Cut out the frontal region
