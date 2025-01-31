@@ -120,10 +120,11 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=100., peakWidThres=5, devSearchC
     idxMaxArc =  idxPeaks[np.argmax(arcLenPeaksWeighted)] #index of maximum arc length
     widMaxArc =  int(widPeaks[np.argmax(arcLenPeaksWeighted)]) #number of indices across maximum arc length
     # Determine discontinuity around the max arc
-    idxRanMaxArcLow = np.clip(idxMaxArc-devSearchCount,0,len(anglesFront)-1)
-    idxRanMaxArcHig = np.clip(idxMaxArc+devSearchCount,0,len(anglesFront)-1)
-    disMaxArcLow = np.mean(samplesFront[idxRanMaxArcLow:idxMaxArc]) #Average Left Peak Distance
-    disMaxArcHig = np.mean(samplesFront[idxMaxArc+1:idxRanMaxArcHig+1])#Average Right Peak Distance
+    idxZero = np.where((anglesFront>-1)&(anglesFront<1))[0][0]
+    idxRanMaxArcLow = np.clip(idxZero-devSearchCount,0,len(anglesFront)-1)
+    idxRanMaxArcHig = np.clip(idxZero+devSearchCount,0,len(anglesFront)-1)
+    disMaxArcLow = np.mean(samplesFront[idxRanMaxArcLow:idxZero]) #Average Left Peak Distance
+    disMaxArcHig = np.mean(samplesFront[idxZero+1:idxRanMaxArcHig+1])#Average Right Peak Distance
     # Compute percentage discontinuity
     if np.max([disMaxArcLow,disMaxArcHig]) > 0.0:
         difDisMaxArc = np.abs(disMaxArcLow-disMaxArcHig)/np.max([disMaxArcLow,disMaxArcHig]) #(0,1) if 1 for very stiff cliff
