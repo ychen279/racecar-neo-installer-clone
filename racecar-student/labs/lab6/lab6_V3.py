@@ -103,8 +103,8 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=100., peakWidThres=5, devSearchC
     # Find the max distance angle
     idxPeaks, _ = signal.find_peaks(samplesFront,width=peakWidThres) #int List of indices for peak locations
     if len(idxPeaks)<=0: #Extrapolation Inertial Guidance
-        angBuf.pop(0) #Empty up a space for the current time step
         angBuf.append(angGusNext)
+        angBuf.pop(0) #Empty up a space for the current time step
         return angGusNext
     widPeaks = signal.peak_widths(samplesFront,idxPeaks)[0] #List of size of these peaks in degrees
     idxPeaks = np.array(idxPeaks)
@@ -130,14 +130,15 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=100., peakWidThres=5, devSearchC
     else:
         difDisMaxArc = 0.0 #Default no difference
     # Compute final angle requirement
-    angMaxArcTune = anglesFront[idxMaxArc]
+    angMaxArcTune = np.sum(anglesFront[idxRanMaxArcLow:idxRanMaxArcHig+1]*samplesFront[idxRanMaxArcLow:idxRanMaxArcHig+1])/np.sum(samplesFront[idxRanMaxArcLow:idxRanMaxArcHig+1])
     if disMaxArcHig>disMaxArcLow: #Apply cliffing correction
         angMaxArcTune += devAngleMax*difDisMaxArc
     else:
         angMaxArcTune -= devAngleMax*difDisMaxArc
     # Output
-    angBuf.pop(0) #Empty up a space for the current time step
     angBuf.append(angMaxArcTune)
+    AverageAngMaxArcTune = np.mean(angBuf)
+    angBuf.pop(0) #Empty up a space for the next time step
     # printing
     print("angle buffer",angBuf)
     print("guessed angle next",angGusNext)
@@ -153,7 +154,8 @@ def FindFarDistAngle(lidarSample,frontHalfAngle=100., peakWidThres=5, devSearchC
     print("Cliff Difference",difDisMaxArc)
     print("Cliff Left and Right",disMaxArcLow," and ",disMaxArcHig)
     print("angMaxArc Tuned",angMaxArcTune)
-    return angMaxArcTune
+    print("Averaged angMaxArc Tuned",AverageAngMaxArcTune)
+    return AverageAngMaxArcTune
 
 
 def PID(errN,errBuf,Kp=0,Ki=0,Kd=0,bufLen=10):
